@@ -50,22 +50,21 @@ table(temp$season_type, dnn = 'Season Type', useNA = 'always')
 colSums(is.na(temp))
 
 vars = c('play_id', 'game_id', 'home_team', 'away_team', 'week', 'posteam',
-         'posteam_type', 'defteam', 'yardline_100', 'game_date',
-         'game_seconds_remaining', 'qtr', 'down', 'goal_to_go', 'ydstogo',
+         'posteam_type', 'defteam', 'game_date', 'game_seconds_remaining',
          'play_type', 'field_goal_result', 'kick_distance', 'extra_point_result',
          'posteam_timeouts_remaining', 'defteam_timeouts_remaining', 
-         'score_differential', 'wp', 'wpa', 'extra_point_attempt',
-         'field_goal_attempt', 'kicker_player_name', 'kicker_player_id',
-         'season', 'start_time', 'weather', 'special_teams_play',
-         'current_drive_play_count', 'drive_top', 'location', 'div_game',
-         'roof', 'surface', 'temp', 'wind', 'age', 'display_name')
+         'score_differential', 'extra_point_attempt', 'field_goal_attempt',
+         'kicker_player_name', 'kicker_player_id', 'season', 'start_time',
+         'weather', 'special_teams_play', 'current_drive_play_count', 
+         'drive_top', 'div_game', 'roof', 'surface', 'temp', 'wind',
+         'age')
 temp = temp %>%
   dplyr::select(all_of(vars))
 colnames(temp)
 colSums(is.na(temp))
 
 # -------------------------------------------------------------------------
-# Assessing Interactions --------------------------------------------------
+# Assessing Interactions with Field Goal Result ---------------------------
 
 ## roof: 1 = open, 0 = closed
 roof = temp %>%
@@ -96,217 +95,623 @@ roof_plot
 
 
 ## surface: 1 == turf, 0 == grass
-table(pbp_clean$interception, pbp_clean$surface,
-      dnn = list('Interception', 'Surface'), useNA = 'always')
-int_by_surface = pbp_clean %>%
-  mutate(surface = if_else(surface == 0, 'grass', 'turf'),
-         interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(surface, interception) %>%
+surface = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(surface, field_goal_result) %>%
+  mutate(surface = if_else(surface == 1, 'turf', 'grass')) %>%
+  group_by(surface, field_goal_result) %>%
   summarise(count = n(), .groups = 'drop')
-int_by_surface_plot = plot_ly(data = int_by_surface,
-                              x = ~surface,
-                              y = ~count,
-                              type = 'bar',
-                              marker = list(line = list(color = 'black',
-                                                        width = 1)),
-                              name = ~interception,
-                              color = ~interception,
-                              hovertemplate = paste(
-                                'Surface: %{x}',
-                                '<br>Interceptions: %{y}',
-                                '<extra></extra>')) %>%
+surface_plot = plot_ly(data = surface,
+                       x = ~surface,
+                       y = ~count,
+                       color = ~field_goal_result,
+                       customdata = ~field_goal_result,
+                       type = 'bar',
+                       marker = list(line = list(color = 'black',
+                                                 width = 1)),
+                       name = ~field_goal_result,
+                       hovertemplate = paste(
+                         'Surface: %{x}',
+                         '<br>Count: %{y}<br>',
+                         '<br>Field Goal Result: %{customdata}',
+                         '<extra></extra>')) %>%
   layout(xaxis = list(title = 'Surface'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Interceptions by Surface',
-         legend = list(title = list(text = 'Interception')))
-int_by_surface_plot
+         yaxis = list(title = 'Count'),
+         title = 'Field Goal Result by Surface',
+         legend = list(title = list(text = 'Field Goal Result')))
+surface_plot
 
-## checking interception by wind
-int_by_wind = pbp_clean %>%
-  mutate(interception = if_else(interception == 1, 'yes', 'no'))
-int_by_wind_plot = plot_ly(data = int_by_wind,
-                           x = ~interception,
-                           y = ~wind,
-                           type = 'box',
-                           marker = list(line = list(color = 'black',
-                                                     width = 1)),
-                           name = ~interception) %>%
-  layout(xaxis = list(title = 'Interception'),
+
+## wind
+wind = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(wind, field_goal_result)
+wind_plot = plot_ly(data = wind,
+                    x = ~field_goal_result,
+                    y = ~wind,
+                    color = ~field_goal_result,
+                    type = 'box',
+                    marker = list(line = list(color = 'black',
+                                              width = 1)),
+                    name = ~field_goal_result,
+                    hovertemplate = paste(
+                      'Field Goal Result: %{x}',
+                      '<br>Wind (mph): %{y}<br>',
+                      '<extra></extra>'
+                    )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
          yaxis = list(title = 'Wind (mph)'),
-         title = 'Interception by Wind (mph)',
-         legend = list(title = list(text = 'Interception')))
-int_by_wind_plot
+         title = 'Field Goal Result by Wind (mph)',
+         legend = list(title = list(text = 'Field Goal Result')))
+wind_plot
 
-## checking interception by temp
-int_by_temp = pbp_clean %>%
-  dplyr::select(interception, temp) %>%
-  mutate(interception = if_else(interception == 1, 'yes', 'no'))
-int_by_temp_plot = plot_ly(data = int_by_temp,
-                           x = ~interception,
-                           y = ~temp,
-                           type = 'box',
-                           marker = list(line = list(color = 'black',
-                                                     width = 1)),
-                           name = ~interception) %>%
-  layout(xaxis = list(title = 'Interception'),
-         yaxis = list(title = 'Temp'),
-         title = 'Interception by Temp',
-         legend = list(title = list(text = 'Interception')))
-int_by_temp_plot
 
-## checking interception by weather
-table(pbp_clean$interception, pbp_clean$weather,
-      dnn = list('Interception', 'Weather'), useNA = 'always')
-int_by_weather = pbp_clean %>%
-  mutate(weather = if_else(weather == 1, 'precipitation', 'clear'),
-         interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(weather, interception) %>%
+## temperature
+temperature = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(temp, field_goal_result)
+temp_plot = plot_ly(data = temperature,
+                    x = ~field_goal_result,
+                    y = ~temp,
+                    color = ~field_goal_result,
+                    type = 'box',
+                    marker = list(line = list(color = 'black',
+                                              width = 1)),
+                    name = ~field_goal_result,
+                    hovertemplate = paste(
+                      'Field Goal Result: %{x}',
+                      '<br>Temperature: %{y}<br>',
+                      '<extra></extra>'
+                    )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Temperature'),
+         title = 'Field Goal Result by Temperature',
+         legend = list(title = list(text = 'Field Goal Result')))
+temp_plot
+
+
+## weather: 1 == precipitation, 0 == clear skies
+weather = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(weather, field_goal_result) %>%
+  mutate(weather = if_else(weather == 1, 'precipitation', 'clear')) %>%
+  group_by(weather, field_goal_result) %>%
   summarise(count = n(), .groups = 'drop')
-int_by_weather_plot = plot_ly(data = int_by_weather,
-                              x = ~weather,
-                              y = ~count,
-                              type = 'bar',
-                              marker = list(line = list(color = 'black',
-                                                        width = 1)),
-                              name = ~interception,
-                              color = ~interception,
-                              hovertemplate = paste(
-                                'Weather: %{x}',
-                                '<br>Interceptions: %{y}',
-                                '<extra></extra>')) %>%
+weather_plot = plot_ly(data = weather,
+                       x = ~weather,
+                       y = ~count,
+                       color = ~field_goal_result,
+                       customdata = ~field_goal_result,
+                       type = 'bar',
+                       marker = list(line = list(color = 'black',
+                                                 width = 1)),
+                       name = ~field_goal_result,
+                       hovertemplate = paste(
+                         'Weather: %{x}',
+                         '<br>Count: %{y}<br>',
+                         '<br>Field Goal Result: %{customdata}',
+                         '<extra></extra>')) %>%
   layout(xaxis = list(title = 'Weather'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Interceptions by Weather',
-         legend = list(title = list(text = 'Interception')))
-int_by_weather_plot
+         yaxis = list(title = 'Count'),
+         title = 'Field Goal Result by Weather',
+         legend = list(title = list(text = 'Field Goal Result')))
+weather_plot
 
-## checking interception by posteam_timeouts_remaining
-table(pbp_clean$interception, pbp_clean$posteam_timeouts_remaining,
-      dnn = list('Interception', 'Possession Team Timeouts'),
-      useNA = 'always')
-int_by_posteam_timeouts = pbp_clean %>%
-  mutate(posteam_timeouts = case_when(posteam_timeouts_remaining == 0 ~ 'zero',
-                                      posteam_timeouts_remaining == 1 ~ 'one',
-                                      posteam_timeouts_remaining == 2 ~ 'two',
-                                      posteam_timeouts_remaining == 3 ~ 'three'),
-         interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(posteam_timeouts, interception) %>%
-  summarise(count = n(), .groups = 'drop') 
 
-int_by_posteam_to_plot = plot_ly(data = int_by_posteam_timeouts,
-                                 x = ~posteam_timeouts,
-                                 y = ~count,
-                                 type = 'bar',
-                                 marker = list(line = list(color = 'black',
-                                                           width = 1)),
-                                 name = ~interception,
-                                 color = ~interception,
-                                 hovertemplate = paste(
-                                   'Posteam Timeouts: %{x}',
-                                   '<br>Interceptions: %{y}',
-                                   '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'Posteam Timouts'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Posteam Timeouts by Weather',
-         legend = list(title = list(text = 'Interception')))
-int_by_posteam_to_plot
-
-## checking interception by defteam_timeouts_remaining
-table(pbp_clean$interception, pbp_clean$defteam_timeouts_remaining,
-      dnn = list('Interception', 'Defensive Team Timeouts'),
-      useNA = 'always')
-int_by_defteam_timeouts = pbp_clean %>%
-  mutate(defteam_timeouts = case_when(defteam_timeouts_remaining == 0 ~ 'zero',
-                                      defteam_timeouts_remaining == 1 ~ 'one',
-                                      defteam_timeouts_remaining == 2 ~ 'two',
-                                      defteam_timeouts_remaining == 3 ~ 'three'),
-         interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(defteam_timeouts, interception) %>%
-  summarise(count = n(), .groups = 'drop') 
-
-int_by_defteam_to_plot = plot_ly(data = int_by_defteam_timeouts,
-                                 x = ~defteam_timeouts,
-                                 y = ~count,
-                                 type = 'bar',
-                                 marker = list(line = list(color = 'black',
-                                                           width = 1)),
-                                 name = ~interception,
-                                 color = ~interception,
-                                 hovertemplate = paste(
-                                   'Defteam Timeouts: %{x}',
-                                   '<br>Interceptions: %{y}',
-                                   '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'Defteam Timouts'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Defteam Timeouts by Weather',
-         legend = list(title = list(text = 'Interception')))
-int_by_defteam_to_plot
-
-## checking interception by score differential
-int_by_score_diff = pbp_clean %>%
-  dplyr::select(interception, score_differential) %>%
-  mutate(interception = if_else(interception == 1, 'yes', 'no'))
-int_by_score_diff_plot = plot_ly(data = int_by_score_diff,
-                                 x = ~interception,
-                                 y = ~score_differential,
-                                 type = 'box',
-                                 marker = list(line = list(color = 'black',
-                                                           width = 1)),
-                                 name = ~interception) %>%
-  layout(xaxis = list(title = 'Interception'),
-         yaxis = list(title = 'Score Differential'),
-         title = 'Interception by Score Differential',
-         legend = list(title = list(text = 'Interception')))
-int_by_score_diff_plot
-
-## checking interception by current_drive_play_count
-int_by_dpc = pbp_clean %>%
-  dplyr::select(interception, current_drive_play_count) %>%
-  mutate(interception = if_else(interception == 1, 'yes', 'no'))
-int_by_dpc_plot = plot_ly(data = int_by_dpc,
-                          x = ~interception,
-                          y = ~current_drive_play_count,
-                          type = 'box',
-                          marker = list(line = list(color = 'black',
-                                                    width = 1)),
-                          name = ~interception) %>%
-  layout(xaxis = list(title = 'Interception'),
-         yaxis = list(title = 'Current Drive Play Count'),
-         title = 'Interception by Drive Play Count',
-         legend = list(title = list(text = 'Interception')))
-int_by_dpc_plot
-
-## checking interception by location
-table(pbp_clean$interception, pbp_clean$location,
-      dnn = list('Interception', 'Location'), useNA = 'always')
-int_by_location = pbp_clean %>%
-  mutate(location = if_else(location == 1, 'home', 'away'),
-         interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(location, interception) %>%
+## posteam_timeouts_remaining
+posteam_timeouts = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(posteam_timeouts_remaining, field_goal_result) %>%
+  mutate(posteam_timeouts = case_when(
+    posteam_timeouts_remaining == 0 ~ 'zero',
+    posteam_timeouts_remaining == 1 ~ 'one',
+    posteam_timeouts_remaining == 2 ~ 'two',
+    posteam_timeouts_remaining == 3 ~ 'three'
+  )) %>%
+  group_by(posteam_timeouts, field_goal_result) %>%
   summarise(count = n(), .groups = 'drop')
-int_by_location_plot = plot_ly(data = int_by_location,
-                               x = ~location,
-                               y = ~count,
-                               type = 'bar',
-                               marker = list(line = list(color = 'black',
-                                                         width = 1)),
-                               name = ~interception,
-                               color = ~interception,
-                               hovertemplate = paste(
-                                 'Location: %{x}',
-                                 '<br>Interceptions: %{y}',
-                                 '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'Location'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Interceptions by Location',
-         legend = list(title = list(text = 'Interception')))
-int_by_location_plot
+posteam_timeouts_plot = plot_ly(data = posteam_timeouts,
+                                x = ~posteam_timeouts,
+                                y = ~count,
+                                color = ~field_goal_result,
+                                customdata = ~field_goal_result,
+                                type = 'bar',
+                                marker = list(line = list(color = 'black',
+                                                          width = 1)),
+                                name = ~field_goal_result,
+                                hovertemplate = paste(
+                                  'Possession Team TO: %{x}',
+                                  '<br>Count: %{y}<br>',
+                                  '<br>Field Goal Result: %{customdata}',
+                                  '<extra></extra>')) %>%
+  layout(xaxis = list(title = 'Possession Team Timeouts'),
+         yaxis = list(title = 'Count'),
+         title = 'Field Goal Result by Possession Team Timeouts',
+         legend = list(title = list(text = 'Field Goal Result')))
+posteam_timeouts_plot
+
+
+## defteam_timeouts_remaining
+defteam_timeouts = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(defteam_timeouts_remaining, field_goal_result) %>%
+  mutate(defteam_timeouts = case_when(
+    defteam_timeouts_remaining == 0 ~ 'zero',
+    defteam_timeouts_remaining == 1 ~ 'one',
+    defteam_timeouts_remaining == 2 ~ 'two',
+    defteam_timeouts_remaining == 3 ~ 'three'
+  )) %>%
+  group_by(defteam_timeouts, field_goal_result) %>%
+  summarise(count = n(), .groups = 'drop')
+defteam_timeouts_plot = plot_ly(data = defteam_timeouts,
+                                x = ~defteam_timeouts,
+                                y = ~count,
+                                color = ~field_goal_result,
+                                customdata = ~field_goal_result,
+                                type = 'bar',
+                                marker = list(line = list(color = 'black',
+                                                          width = 1)),
+                                name = ~field_goal_result,
+                                hovertemplate = paste(
+                                  'Defensive Team TO: %{x}',
+                                  '<br>Count: %{y}<br>',
+                                  '<br>Field Goal Result: %{customdata}',
+                                  '<extra></extra>')) %>%
+  layout(xaxis = list(title = 'Defensive Team Timeouts'),
+         yaxis = list(title = 'Count'),
+         title = 'Field Goal Result by Defensiv Team Timeouts',
+         legend = list(title = list(text = 'Field Goal Result')))
+defteam_timeouts_plot
+
+
+## score differential
+score_differential = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(score_differential, field_goal_result)
+score_differential_plot = plot_ly(data = score_differential,
+                                  x = ~field_goal_result,
+                                  y = ~score_differential,
+                                  color = ~field_goal_result,
+                                  type = 'box',
+                                  marker = list(line = list(color = 'black',
+                                                            width = 1)),
+                                  name = ~field_goal_result,
+                                  hovertemplate = paste(
+                                    'Field Goal Result: %{x}',
+                                    '<br>Score Differential: %{y}<br>',
+                                    '<extra></extra>'
+                                  )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Score Differential'),
+         title = 'Field Goal Result by Score Differential',
+         legend = list(title = list(text = 'Field Goal Result')))
+score_differential_plot
+
+
+## current_drive_play_count
+current_drive_play_count = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(current_drive_play_count, field_goal_result)
+current_drive_play_count_plot = plot_ly(data = current_drive_play_count,
+                                        x = ~field_goal_result,
+                                        y = ~current_drive_play_count,
+                                        color = ~field_goal_result,
+                                        type = 'box',
+                                        marker = list(line = list(color = 'black',
+                                                                  width = 1)),
+                                        name = ~field_goal_result,
+                                        hovertemplate = paste(
+                                          'Field Goal Result: %{x}',
+                                          '<br>Current Drive Play Count: %{y}<br>',
+                                          '<extra></extra>'
+                                        )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Current Drive Play Count'),
+         title = 'Field Goal Result by Current Drive Play Count',
+         legend = list(title = list(text = 'Field Goal Result')))
+current_drive_play_count_plot
+
+
+## age
+age = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(age, field_goal_result)
+age_plot = plot_ly(data = age,
+                   x = ~field_goal_result,
+                   y = ~age,
+                   color = ~field_goal_result,
+                   type = 'box',
+                   marker = list(line = list(color = 'black',
+                                             width = 1)),
+                   name = ~field_goal_result,
+                   hovertemplate = paste(
+                     'Field Goal Result: %{x}',
+                     '<br>Age: %{y}<br>',
+                     '<extra></extra>'
+                   )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Age'),
+         title = 'Field Goal Result by Age',
+         legend = list(title = list(text = 'Field Goal Result')))
+age_plot
+
+
+## drive_top
+drive_top = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(drive_top, field_goal_result)
+drive_top_plot = plot_ly(data = drive_top,
+                         x = ~field_goal_result,
+                         y = ~drive_top,
+                         color = ~field_goal_result,
+                         type = 'box',
+                         marker = list(line = list(color = 'black',
+                                                   width = 1)),
+                         name = ~field_goal_result,
+                         hovertemplate = paste(
+                           'Field Goal Result: %{x}',
+                           '<br>Drive Time of Possession: %{y}<br>',
+                           '<extra></extra>'
+                         )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Drive Time of Possession'),
+         title = 'Field Goal Result by Drive Time of Possession',
+         legend = list(title = list(text = 'Field Goal Result')))
+drive_top_plot
+
+
+## kick_distance
+kick_distance = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(kick_distance, field_goal_result)
+kick_distance_plot = plot_ly(data = kick_distance,
+                             x = ~field_goal_result,
+                             y = ~kick_distance,
+                             color = ~field_goal_result,
+                             type = 'box',
+                             marker = list(line = list(color = 'black',
+                                                       width = 1)),
+                             name = ~field_goal_result,
+                             hovertemplate = paste(
+                               'Field Goal Result: %{x}',
+                               '<br>Kick Distance: %{y}<br>',
+                               '<extra></extra>'
+                             )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Kick Distance'),
+         title = 'Field Goal Result by Kick Distance',
+         legend = list(title = list(text = 'Field Goal Result')))
+kick_distance_plot
+## there is a visible correlation between kick_distance and field_goal_result
+
+
+## game_seconds_remaining
+game_seconds_remaining = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(game_seconds_remaining, field_goal_result)
+game_seconds_remaining_plot = plot_ly(data = game_seconds_remaining,
+                                      x = ~field_goal_result,
+                                      y = ~game_seconds_remaining,
+                                      color = ~field_goal_result,
+                                      type = 'box',
+                                      marker = list(line = list(color = 'black',
+                                                                width = 1)),
+                                      name = ~field_goal_result,
+                                      hovertemplate = paste(
+                                        'Field Goal Result: %{x}',
+                                        '<br>Game Seconds Remaining: %{y}<br>',
+                                        '<extra></extra>'
+                                      )) %>%
+  layout(xaxis = list(title = 'Field Goal Result'),
+         yaxis = list(title = 'Game Seconds Remaining'),
+         title = 'Field Goal Result by Game Seconds Remaining',
+         legend = list(title = list(text = 'Field Goal Result')))
+game_seconds_remaining_plot
+
+
+## correlation plot
+field_goal = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(all_of(c('age',
+                         'wind',
+                         'temp',
+                         'surface',
+                         'roof',
+                         'div_game',
+                         'drive_top',
+                         'current_drive_play_count',
+                         'weather',
+                         'start_time',
+                         'score_differential',
+                         'defteam_timeouts_remaining',
+                         'posteam_timeouts_remaining',
+                         'game_seconds_remaining',
+                         'kick_distance',
+                         'field_goal_result'))) %>%
+  mutate(field_goal_result = case_when(field_goal_result == 'made' ~ 0,
+                                       field_goal_result == 'missed' ~ 1,
+                                       field_goal_result == 'blocked' ~ 2))
+corr_matrix = cor(field_goal)
+corrplot(corr_matrix, method='color', type='upper', tl.cex=0.5,
+         tl.srt=45, cl.pos='b', mar=c(0, 0, 4, 0))
 
 # -------------------------------------------------------------------------
-# Saving Cleaned Play-By-Play Data ----------------------------------------
+# Assessing Interactions with Extra Point Result --------------------------
 
-int_pbp_clean = pbp_clean
-fname = './data/cleaned/interception/int_pbp_clean.Rdata'
-save(int_pbp_clean, file = fname)
+## roof: 1 = open, 0 = closed
+roof = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(roof, extra_point_result) %>%
+  mutate(roof = if_else(roof == 1, 'open', 'closed')) %>%
+  group_by(roof, extra_point_result) %>%
+  summarise(count = n(), .groups = 'drop')
+roof_plot = plot_ly(data = roof,
+                    x = ~roof,
+                    y = ~count,
+                    color = ~extra_point_result,
+                    customdata = ~extra_point_result,
+                    type = 'bar',
+                    marker = list(line = list(color = 'black',
+                                              width = 1)),
+                    name = ~extra_point_result,
+                    hovertemplate = paste(
+                      'Roof Type: %{x}',
+                      '<br>Count: %{y}<br>',
+                      '<br>Extra Point Result: %{customdata}',
+                      '<extra></extra>')) %>%
+  layout(xaxis = list(title = 'Roof Type'),
+         yaxis = list(title = 'Count'),
+         title = 'Extra Point Result by Roof Type',
+         legend = list(title = list(text = 'Extra Point Result')))
+roof_plot
+
+
+## surface: 1 == turf, 0 == grass
+surface = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(surface, extra_point_result) %>%
+  mutate(surface = if_else(surface == 1, 'turf', 'grass')) %>%
+  group_by(surface, extra_point_result) %>%
+  summarise(count = n(), .groups = 'drop')
+surface_plot = plot_ly(data = surface,
+                       x = ~surface,
+                       y = ~count,
+                       color = ~extra_point_result,
+                       customdata = ~extra_point_result,
+                       type = 'bar',
+                       marker = list(line = list(color = 'black',
+                                                 width = 1)),
+                       name = ~extra_point_result,
+                       hovertemplate = paste(
+                         'Surface: %{x}',
+                         '<br>Count: %{y}<br>',
+                         '<br>Extra Point Result: %{customdata}',
+                         '<extra></extra>')) %>%
+  layout(xaxis = list(title = 'Surface'),
+         yaxis = list(title = 'Count'),
+         title = 'Extra Point Result by Surface',
+         legend = list(title = list(text = 'Extra Point Result')))
+surface_plot
+
+
+## wind
+wind = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(wind, extra_point_result)
+wind_plot = plot_ly(data = wind,
+                    x = ~extra_point_result,
+                    y = ~wind,
+                    color = ~extra_point_result,
+                    type = 'box',
+                    marker = list(line = list(color = 'black',
+                                              width = 1)),
+                    name = ~extra_point_result,
+                    hovertemplate = paste(
+                      'Extra Point Result: %{x}',
+                      '<br>Wind (mph): %{y}<br>',
+                      '<extra></extra>'
+                    )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Wind (mph)'),
+         title = 'Extra Point Result by Wind (mph)',
+         legend = list(title = list(text = 'Extra Point Result')))
+wind_plot
+
+
+## temperature
+temperature = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(temp, extra_point_result)
+temp_plot = plot_ly(data = temperature,
+                    x = ~extra_point_result,
+                    y = ~temp,
+                    color = ~extra_point_result,
+                    type = 'box',
+                    marker = list(line = list(color = 'black',
+                                              width = 1)),
+                    name = ~extra_point_result,
+                    hovertemplate = paste(
+                      'Extra Point Result: %{x}',
+                      '<br>Temperature: %{y}<br>',
+                      '<extra></extra>'
+                    )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Temperature'),
+         title = 'Extra Point Result by Temperature',
+         legend = list(title = list(text = 'Extra Point Result')))
+temp_plot
+
+
+## weather: 1 == precipitation, 0 == clear skies
+weather = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(weather, extra_point_result) %>%
+  mutate(weather = if_else(weather == 1, 'precipitation', 'clear')) %>%
+  group_by(weather, extra_point_result) %>%
+  summarise(count = n(), .groups = 'drop')
+weather_plot = plot_ly(data = weather,
+                       x = ~weather,
+                       y = ~count,
+                       color = ~extra_point_result,
+                       customdata = ~extra_point_result,
+                       type = 'bar',
+                       marker = list(line = list(color = 'black',
+                                                 width = 1)),
+                       name = ~extra_point_result,
+                       hovertemplate = paste(
+                         'Weather: %{x}',
+                         '<br>Count: %{y}<br>',
+                         '<br>Extra Point Result: %{customdata}',
+                         '<extra></extra>')) %>%
+  layout(xaxis = list(title = 'Weather'),
+         yaxis = list(title = 'Count'),
+         title = 'Extra Point Result by Weather',
+         legend = list(title = list(text = 'Extra Point Result')))
+weather_plot
+
+
+## score differential
+score_differential = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(score_differential, extra_point_result)
+score_differential_plot = plot_ly(data = score_differential,
+                                  x = ~extra_point_result,
+                                  y = ~score_differential,
+                                  color = ~extra_point_result,
+                                  type = 'box',
+                                  marker = list(line = list(color = 'black',
+                                                            width = 1)),
+                                  name = ~extra_point_result,
+                                  hovertemplate = paste(
+                                    'Extra Point Result: %{x}',
+                                    '<br>Score Differential: %{y}<br>',
+                                    '<extra></extra>'
+                                  )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Score Differential'),
+         title = 'Extra Point Result by Score Differential',
+         legend = list(title = list(text = 'Extra Point Result')))
+score_differential_plot
+
+
+## current_drive_play_count
+current_drive_play_count = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(current_drive_play_count, extra_point_result)
+current_drive_play_count_plot = plot_ly(data = current_drive_play_count,
+                                        x = ~extra_point_result,
+                                        y = ~current_drive_play_count,
+                                        color = ~extra_point_result,
+                                        type = 'box',
+                                        marker = list(line = list(color = 'black',
+                                                                  width = 1)),
+                                        name = ~extra_point_result,
+                                        hovertemplate = paste(
+                                          'Extra Point Result: %{x}',
+                                          '<br>Current Drive Play Count: %{y}<br>',
+                                          '<extra></extra>'
+                                        )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Current Drive Play Count'),
+         title = 'Extra Point Result by Current Drive Play Count',
+         legend = list(title = list(text = 'Extra Point Result')))
+current_drive_play_count_plot
+
+
+## age
+age = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(age, extra_point_result)
+age_plot = plot_ly(data = age,
+                   x = ~extra_point_result,
+                   y = ~age,
+                   color = ~extra_point_result,
+                   type = 'box',
+                   marker = list(line = list(color = 'black',
+                                             width = 1)),
+                   name = ~extra_point_result,
+                   hovertemplate = paste(
+                     'Extra Point Result: %{x}',
+                     '<br>Age: %{y}<br>',
+                     '<extra></extra>'
+                   )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Age'),
+         title = 'Extra Point Result by Age',
+         legend = list(title = list(text = 'Extra Point Result')))
+age_plot
+
+
+## drive_top
+drive_top = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(drive_top, extra_point_result)
+drive_top_plot = plot_ly(data = drive_top,
+                         x = ~extra_point_result,
+                         y = ~drive_top,
+                         color = ~extra_point_result,
+                         type = 'box',
+                         marker = list(line = list(color = 'black',
+                                                   width = 1)),
+                         name = ~extra_point_result,
+                         hovertemplate = paste(
+                           'Extra Point Result: %{x}',
+                           '<br>Drive Time of Possession: %{y}<br>',
+                           '<extra></extra>'
+                         )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Drive Time of Possession'),
+         title = 'Extra Point Result by Drive Time of Possession',
+         legend = list(title = list(text = 'Extra Point Result')))
+drive_top_plot
+
+
+## game_seconds_remaining
+game_seconds_remaining = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(game_seconds_remaining, extra_point_result)
+game_seconds_remaining_plot = plot_ly(data = game_seconds_remaining,
+                                      x = ~extra_point_result,
+                                      y = ~game_seconds_remaining,
+                                      color = ~extra_point_result,
+                                      type = 'box',
+                                      marker = list(line = list(color = 'black',
+                                                                width = 1)),
+                                      name = ~extra_point_result,
+                                      hovertemplate = paste(
+                                        'Extra Point Result: %{x}',
+                                        '<br>Game Seconds Remaining: %{y}<br>',
+                                        '<extra></extra>'
+                                      )) %>%
+  layout(xaxis = list(title = 'Extra Point Result'),
+         yaxis = list(title = 'Game Seconds Remaining'),
+         title = 'Extra Point Result by Game Seconds Remaining',
+         legend = list(title = list(text = 'Extra Point Result')))
+game_seconds_remaining_plot
+
+
+## correlation plot
+extra_point = temp %>%
+  filter(extra_point_attempt == 1) %>%
+  dplyr::select(all_of(c('age',
+                         'wind',
+                         'temp',
+                         'surface',
+                         'roof',
+                         'div_game',
+                         'drive_top',
+                         'current_drive_play_count',
+                         'weather',
+                         'start_time',
+                         'score_differential',
+                         'game_seconds_remaining',
+                         'extra_point_result'))) %>%
+  mutate(extra_point_result = case_when(extra_point_result == 'good' ~ 0,
+                                        extra_point_result == 'failed' ~ 1,
+                                        extra_point_result == 'blocked' ~ 2)) %>%
+  na.omit()
+corr_matrix = cor(extra_point)
+corrplot(corr_matrix, method='color', type='upper', tl.cex=0.5,
+         tl.srt=45, cl.pos='b', mar=c(0, 0, 4, 0))
 
 # -------------------------------------------------------------------------
