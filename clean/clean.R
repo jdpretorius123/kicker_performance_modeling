@@ -45,9 +45,6 @@ stats = nflfastR::load_player_stats(TRUE)
 glimpse(stats)
 colSums(is.na(stats))
 
-fname = './data/raw/stats.Rdata'
-save(stats, file = fname)
-
 # -------------------------------------------------------------------------
 # Selecting Variables, and Checking Missingness  --------------------------
 pbp_temp = pbp %>%
@@ -500,20 +497,17 @@ table(hour(pbp_clean$start_time), dnn = c('Start Time'), useNA = 'always')
 # -------------------------------------------------------------------------
 # Identifying Variables with One Value ------------------------------------
 
-pbp_temp %>% 
+pbp_clean %>% 
   map_int(n_distinct) %>%
   keep(~.x == 1)
 ## position and quarter_end only have one value and will be removed
 
-pbp_temp = pbp_temp %>%
+pbp_clean = pbp_clean %>%
   dplyr::select(!all_of(c('position', 'quarter_end')))
-glimpse(pbp_temp)
+glimpse(pbp_clean)
 
 # -------------------------------------------------------------------------
 # Saving Raw Data ---------------------------------------------------------
-
-## one last check before saving the cleaned data
-glimpse(pbp_clean)
 
 fname = './data/master/pbp_clean.Rdata'
 save(pbp_clean, file = fname)

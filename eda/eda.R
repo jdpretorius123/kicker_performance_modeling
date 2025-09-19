@@ -37,123 +37,65 @@ load(fname)
 # Creating a Temporary Dataset --------------------------------------------
 
 temp = pbp_clean %>%
-  filter(play_type != 'no_play', season_type == 'REG')
+  filter(play_type != 'no_play', season_type == 'REG') %>%
+  mutate(drive_top = hour(drive_time_of_possession) + 
+           (minute(drive_time_of_possession)/60) + 
+           (second(drive_time_of_possession)/60),
+         start_time = hour(start_time) + 
+           (minute(start_time)/60) + 
+           (second(start_time)/60))
 table(temp$play_type, dnn = 'Play Type', useNA = 'always')
 table(temp$season_type, dnn = 'Season Type', useNA = 'always')
+
+colSums(is.na(temp))
+
+vars = c('play_id', 'game_id', 'home_team', 'away_team', 'week', 'posteam',
+         'posteam_type', 'defteam', 'yardline_100', 'game_date',
+         'game_seconds_remaining', 'qtr', 'down', 'goal_to_go', 'ydstogo',
+         'play_type', 'field_goal_result', 'kick_distance', 'extra_point_result',
+         'posteam_timeouts_remaining', 'defteam_timeouts_remaining', 
+         'score_differential', 'wp', 'wpa', 'extra_point_attempt',
+         'field_goal_attempt', 'kicker_player_name', 'kicker_player_id',
+         'season', 'start_time', 'weather', 'special_teams_play',
+         'current_drive_play_count', 'drive_top', 'location', 'div_game',
+         'roof', 'surface', 'temp', 'wind', 'age', 'display_name')
+temp = temp %>%
+  dplyr::select(all_of(vars))
+colnames(temp)
+colSums(is.na(temp))
 
 # -------------------------------------------------------------------------
 # Assessing Interactions --------------------------------------------------
 
-## listing the factors in pbp_clean
-factors = sapply(pbp_clean, is.factor)
-names(pbp_clean)[factors]
-
 ## roof: 1 = open, 0 = closed
-roof = pbp_clean %>%
-  dplyr::select(roof, interception) %>%
-  mutate(roof = if_else(roof == 1, 'open', 'closed'),
-         interception = if_else(interception == 1, 'Yes', 'No')) %>%
-  group_by(roof) %>%
-  summarise(total_ints = n(), .groups = 'drop')
+roof = temp %>%
+  filter(field_goal_attempt == 1) %>%
+  dplyr::select(roof, field_goal_result) %>%
+  mutate(roof = if_else(roof == 1, 'open', 'closed')) %>%
+  group_by(roof, field_goal_result) %>%
+  summarise(count = n(), .groups = 'drop')
 roof_plot = plot_ly(data = roof,
                     x = ~roof,
-                    y = ~total_ints,
+                    y = ~count,
+                    color = ~field_goal_result,
+                    customdata = ~field_goal_result,
                     type = 'bar',
                     marker = list(line = list(color = 'black',
                                               width = 1)),
-                    name = ~roof,
+                    name = ~field_goal_result,
                     hovertemplate = paste(
                       'Roof Type: %{x}',
-                      '<br>Total Interceptions: %{y}',
+                      '<br>Count: %{y}<br>',
+                      '<br>Field Goal Result: %{customdata}',
                       '<extra></extra>')) %>%
   layout(xaxis = list(title = 'Roof Type'),
-         yaxis = list(title = 'Total Interceptions'),
-         title = 'Total Interceptions by Roof Type',
-         legend = list(title = list(text = 'Roof Type')))
+         yaxis = list(title = 'Count'),
+         title = 'Field Goal Result by Roof Type',
+         legend = list(title = list(text = 'Field Goal Result')))
 roof_plot
 
 
-## qb_scramble
-qb_scramble = pbp_clean %>%
-  dplyr::select(qb_scramble, interception) %>%
-  mutate(qb_scramble = if_else(qb_scramble == 1, 'Yes', 'No'),
-         interception = if_else(interception == 1, 'Yes', 'No')) %>%
-  group_by(qb_scramble) %>%
-  summarise(total_ints = n(), .groups = 'drop')
-qb_scramble_plot = plot_ly(data = qb_scramble,
-                    x = ~qb_scramble,
-                    y = ~total_ints,
-                    type = 'bar',
-                    marker = list(line = list(color = 'black',
-                                              width = 1)),
-                    name = ~qb_scramble,
-                    hovertemplate = paste(
-                      'QB Scramble: %{x}',
-                      '<br>Total Interceptions: %{y}',
-                      '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'QB Scramble'),
-         yaxis = list(title = 'Total Interceptions'),
-         title = 'Total Interceptions by QB Scramble',
-         legend = list(title = list(text = 'QB Scramble')))
-qb_scramble_plot
-
-## qb_scramble, shotgun, no_huddle
-table(pbp_clean$no_huddle, useNA = 'always')
-table(pbp_clean$shotgun, useNA = 'always')
-table(pbp_clean$qb_scramble, useNA = 'always')
-no_huddle_shotgun = pbp_clean %>%
-  dplyr::select(qb_scramble, shotgun, no_huddle) %>%
-  group_by(no_huddle, shotgun) %>%
-  summarise(count = n(), .groups = 'drop') %>%
-  mutate(no_huddle = factor(if_else(no_huddle == 1, 'yes', 'no')),
-         shotgun = factor(if_else(shotgun == 1, 'yes', 'no')))
-no_huddle_shotgun_plot = plot_ly(data = no_huddle_shotgun,
-                                 x = ~no_huddle,
-                                 y = ~count,
-                                 color = ~shotgun,
-                                 type = 'bar',
-                                 marker = list(line = list(color = 'black',
-                                                           width = 1)),
-                                 name = ~shotgun,
-                                 hovertemplate = paste(
-                                   'Huddle: %{x}',
-                                   '<br>Shotgun: ', no_huddle_shotgun[['shotgun']],
-                                   '<br>QB Scramble Count: %{y}',
-                                   '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'Huddle'),
-         yaxis = list(title = 'QB Scramble Count'),
-         title = 'QB Scramble Count by Shotgun following Huddle/No Huddle',
-         legend = list(title = list(text = 'Shotgun')))
-no_huddle_shotgun_plot
-
-## checking interception by roof type
-table(pbp_clean$interception, pbp_clean$roof, useNA = 'always')
-int_by_roof = pbp_clean %>%
-  mutate(interception = if_else(interception == 1, 'yes', 'no')) %>%
-  group_by(roof, interception) %>%
-  summarise(count = n(), .groups = 'drop')
-int_by_roof_plot = plot_ly(data = int_by_roof,
-                           x = ~roof,
-                           y = ~count,
-                           type = 'bar',
-                           color = ~interception,
-                           marker = list(line = list(color = 'black',
-                                                     width = 1)),
-                           name = ~interception,
-                           hovertemplate = paste(
-                             'Roof: %{x}',
-                             '<br>Interceptions: %{y}',
-                             '<extra></extra>')) %>%
-  layout(xaxis = list(title = 'Roof Type'),
-         yaxis = list(title = 'Interceptions'),
-         title = 'Interceptions by Roof Type',
-         legend = list(title = list(text = 'Interception')))
-int_by_roof_plot
-
-## considering grouping roof into 2 categories: 1. open and 2. closed
-
-
-## checking interception by surface
+## surface: 1 == turf, 0 == grass
 table(pbp_clean$interception, pbp_clean$surface,
       dnn = list('Interception', 'Surface'), useNA = 'always')
 int_by_surface = pbp_clean %>%
